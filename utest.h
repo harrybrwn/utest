@@ -9,83 +9,73 @@ extern "C" {
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdarg.h>
 
+struct utest_runner;
 
-typedef void (*TestMethod)(void);
+typedef void (*TestMethod)(struct utest_runner*);
+typedef int (*AssertionMsgFunc)(const char*, ...);
+
+typedef struct utest_suite
+{
+    void (*setup)(void);
+    void (*teardown)(void);
+
+    TestMethod test;
+    char* name;
+    int status;
+} UTestSuite;
+
+typedef struct utest_runner
+{
+    UTestSuite* current_test;
+    AssertionMsgFunc fail;
+    AssertionMsgFunc warning;
+} UTestRunner;
 
 int n_Tests;
-TestMethod* AllTests;
-int _utest_result = 0;
+UTestSuite *_current_test;
+UTestSuite **AllTests;
 
-int RunTests(void) {
-    for (int i = 0; i < n_Tests; i++)
-    {
-        AllTests[i]();
-        printf(".");
-    }
+// 8 bit unsigned integer.
+typedef unsigned int byte_t __attribute__((__mode__(QI)));
 
-    if (_utest_result == 0)
-        printf("\n\033[0;32mOk\033[0m\n");
-    else
-        printf("\n\033[0;31mFail\033[0m\n");
+int RunTests(void);
 
-    return _utest_result;
-}
+int assertion_failure(const char* fmt, ...);
+int assertion_warning(const char* fmt, ...);
 
-#if defined(AUTOTEST) && !defined(_MAIN_DEFINED)
+/**
+ * Return: 1 for a match, 0 for no match.
+ */
+int binary_compare(byte_t* left, byte_t* right, size_t len);
+
+int arr_eq_s(char** arr1, char** arr2, size_t len);
+int strcomp(char* one, char* two);
+
+#if defined(AUTOTEST) && !defined(_MAIN_DEFINED) && !defined(_UTEST_IMPL)
 #define _MAIN_DEFINED
 int main(void) {
     return RunTests();
 }
-#endif /* AUTOTEST */
+#endif /* AUTOTEST && _MAIN_DEFINED && _UTEST_IMPL */
 
-int assertion_failure(const char* fmt, ...);
+#define _ARR_EQ_DECL(SUFFIX, TYPE)\
+int arr_unordered_eq_##SUFFIX(TYPE*, TYPE*, size_t);\
+int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
 
-#define _ARR_UNORDERED_EQ(SUFFIX, TYPE)                         \
-int arr_unordered_eq_##SUFFIX(TYPE *a1, TYPE *a2, size_t len) { \
-    for (size_t i = 0; i < len; i++) {                          \
-        for (size_t k = 0; k < len; k++) {                      \
-            if (a1[i] == a2[k]) {                               \
-                goto Found;                                     \
-            }                                                   \
-        }                                                       \
-        return 0;                                               \
-    Found:;                                                     \
-    }                                                           \
-    return 1;                                                   \
-}
+_ARR_EQ_DECL(i, int)
+_ARR_EQ_DECL(ui, unsigned int)
+_ARR_EQ_DECL(l, long)
+_ARR_EQ_DECL(ul, unsigned long)
+_ARR_EQ_DECL(f, float)
+_ARR_EQ_DECL(d, double)
 
-#define _ARR_ORDERED_EQ(SUFFIX, TYPE)                     \
-int arr_eq_##SUFFIX(TYPE *arr1, TYPE *arr2, size_t len) { \
-    for (size_t i = 0; i < len; i++)                      \
-        if (arr1[i] != arr2[i])                           \
-            return 0;                                     \
-    return 1;                                             \
-}
-
-#define _ARR_EQ_ALL(SUFFIX, TYPE) \
-_ARR_ORDERED_EQ(SUFFIX, TYPE)     \
-_ARR_UNORDERED_EQ(SUFFIX, TYPE)
-
-_ARR_EQ_ALL(i, int)
-_ARR_EQ_ALL(ui, unsigned int)
-_ARR_EQ_ALL(l, long)
-_ARR_EQ_ALL(ul, unsigned long)
-_ARR_EQ_ALL(f, float)
-_ARR_EQ_ALL(d, double)
-
-int arr_eq_s(char** arr1, char** arr2, size_t len) {
-    for (size_t i = 0; i < len; i++)
-        if (strcmp(arr1[i], arr2[i]) != 0)
-            return 0;
-    return 1;
-}
+#undef _ARR_EQ_DECL
 
 #define _EQ_EXPR(A, B)                                                          \
 (_Generic((A),                                                                  \
-    char*:       strcmp(((char*)(uintptr_t)(A)), ((char*)(uintptr_t)(B))) == 0, \
-    const char*: strcmp(((char*)(uintptr_t)(A)), ((char*)(uintptr_t)(B))) == 0, \
+    char*:       strcomp(((char*)(uintptr_t)(A)), ((char*)(uintptr_t)(B))) == 0, \
+    const char*: strcomp(((char*)(uintptr_t)(A)), ((char*)(uintptr_t)(B))) == 0, \
     default: A == B)                                                            \
 )
 
@@ -112,73 +102,83 @@ int arr_eq_s(char** arr1, char** arr2, size_t len) {
     default:            memcmp((void*)A,             (void*)B, LEN) == 0)     \
 )
 
+#define _ASSERT_FAIL(exp)\
+    (_current_test->status += assertion_failure("TEST(%s) %s:%d '%s'\n",\
+                _current_test->name, __FILE__, __LINE__, exp))
+
 #ifndef assert
 #undef assert
-#define assert(exp) (exp) ? ((void)0) : (_utest_result += assertion_failure("%s:%d '%s'\n", __FILE__, __LINE__, #exp));
+#define assert(exp) (exp) ? ((void)0) : _ASSERT_FAIL(#exp);
 #endif
 
-#define assert_eq(A, B) \
-    (_EQ_EXPR(A, B)) ?  \
-        ((void)0) :     \
-        (_utest_result += assertion_failure("%s:%d '%s'\n", __FILE__, __LINE__, #A " eq " #B))
+#define assert_eq(A, B)                        \
+    ({__typeof__(A) _A = A;                    \
+    __typeof__(B) _B = B;                      \
+    (_EQ_EXPR(_A, _B)) ? \
+        ((void)0) :                            \
+        _ASSERT_FAIL(#A " == " #B);})
 
 #define assert_not_eq(A, B)  \
-    (!_EQ_EXPR(A, B)) ?      \
+    ({__typeof__(A) _A = A;  \
+    __typeof__(B) _B   = B;  \
+    (!_EQ_EXPR(_A, _B)) ?      \
         ((void)0) :          \
-        (_utest_result += assertion_failure("%s:%d '%s'\n", __FILE__, __LINE__, #A " eq " #B))
+        _ASSERT_FAIL(#A " != " #B);})
 
-#define assert_n_eq(A, B, LEN)    \
-    (_ARRAY_EQ_EXPR(A, B, LEN)) ? \
+#define assert_eqn(A, B, LEN)     \
+    (binary_compare((byte_t*)(uintptr_t)A, (byte_t*)(uintptr_t)B, LEN)) ? \
         ((void)0) :               \
-        (_utest_result += assertion_failure("%s:%d '%s'\n", __FILE__, __LINE__, #A " eq " #B))
+        _ASSERT_FAIL(#A " == " #B)
 
-#define assert_n_not_eq(A, B, LEN) \
+#define assert_not_eqn(A, B, LEN)  \
     (!_ARRAY_EQ_EXPR(A, B, LEN)) ? \
         ((void)0) :                \
-        (_utest_result += assertion_failure("%s:%d '%s'\n", __FILE__, __LINE__, #A " eq " #B))
+        _ASSERT_FAIL(#A " != " #B)
 
 #define eq(A, B)         assert_eq(A, B)
-#define eqn(A, B, L)     assert_n_eq(A, B, L)
-#define not_eqn(A, B, L) assert_n_not_eq(A, B, L)
+#define not_eq(A, B)     assert_not_eq(A, B)
+#define eqn(A, B, L)     assert_eqn(A, B, L)
+#define not_eqn(A, B, L) assert_not_eqn(A, B, L)
 
-#define _TEST_DECL(NAME) void _utest_##NAME(void)
+#define _TEST_DECL(NAME) void _utest_##NAME(UTestRunner* runner __attribute__((unused)))
 
-#define TEST(NAME)                                                                     \
-    _TEST_DECL(NAME);                                                                  \
-    __attribute__((constructor))                                                       \
-    void _add_##NAME##_to_tests(void) {                                                \
-        AllTests = (TestMethod*)realloc(AllTests, (n_Tests + 1) * sizeof(TestMethod)); \
-        AllTests[n_Tests++] = _utest_##NAME;                                           \
-    }                                                                                  \
+#define TEST(NAME, ...)                                                                  \
+    _TEST_DECL(NAME);                                                                    \
+    __attribute__((constructor))                                                         \
+    void _add_##NAME##_to_tests(void) {                                                  \
+        UTestSuite temp = { __VA_ARGS__ };                                               \
+                                                                                         \
+        UTestSuite* newtest = malloc(sizeof(UTestSuite));                                \
+        newtest->name = #NAME;                                                           \
+        newtest->test = _utest_##NAME;                                                   \
+        newtest->status = 0;                                                             \
+        if (temp.setup != NULL) { newtest->setup = temp.setup; }                         \
+        if (temp.teardown != NULL) {          \
+            newtest->teardown = temp.teardown;\
+        }                                     \
+        AllTests = (UTestSuite**)realloc(AllTests, (n_Tests + 1) * sizeof(UTestSuite*)); \
+        AllTests[n_Tests++] = newtest;                                                   \
+    }                                                                                    \
     _TEST_DECL(NAME)
 
+#if !defined(_UTEST_IMPL)
 // runs before any tests
 __attribute__((constructor(101)))
 void __setup(void)
 {
-    AllTests = (TestMethod*)malloc(sizeof(TestMethod*));
+    AllTests = (UTestSuite**)malloc(0);
     n_Tests = 0;
 }
 
 __attribute__((destructor))
 void __cleanup(void)
 {
+    for (int i = 0; i < n_Tests; i++) {
+        free(AllTests[i]);
+    }
     free(AllTests);
 }
-
-int assertion_failure(const char* fmt, ...)
-{
-    char fmtbuf[256];
-    va_list args;
-    snprintf(fmtbuf, sizeof(fmtbuf), "\033[0;31mAssertion Failure:\033[0m %s", fmt);
-
-    va_start(args, fmt);
-    vfprintf(stderr, fmtbuf, args);
-    va_end(args);
-
-    // raise(SIGABRT);
-    return 1;
-}
+#endif /* !defined(_UTEST_IMPL) */
 
 #ifdef __cplusplus
 }

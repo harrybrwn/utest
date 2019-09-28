@@ -1,13 +1,17 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -g -I.
 
-tests/test: tests/test.c tests/test_cases.h utest.h
-	$(CC) $(CFLAGS) -DAUTOTEST -o $@ $<
+
+tests/%: tests/%.c utest.o
+	$(CC) $(CFLAGS) -DAUTOTEST $^ -o $@
+
+utest.o: utest.c utest.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 test: tests/test
 	@tests/test
 
 clean:
-	$(RM) tests/test tests/fail
+	$(RM) tests/test *.o
 
 .PHONY: clean test
