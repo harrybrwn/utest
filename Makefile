@@ -13,7 +13,6 @@ test: tests/test
 cov: test.gcno utest.gcno
 	@./a.out > /dev/null
 	gcov utest test
-	@$(RM) *.gcda
 
 test.gcno utest.gcno: tests/test.c utest.c
 	@$(CC) $(CFLAGS) -DAUTOTEST -fprofile-arcs -ftest-coverage $^
