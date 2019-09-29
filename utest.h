@@ -67,13 +67,6 @@ int main(void) {
 #define _ARR_EQ_DECL(SUFFIX, TYPE)                   \
 int arr_unordered_eq_##SUFFIX(TYPE*, TYPE*, size_t); \
 int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
-
-_ARR_EQ_DECL(i, int)
-_ARR_EQ_DECL(ui, unsigned int)
-_ARR_EQ_DECL(l, long)
-_ARR_EQ_DECL(ul, unsigned long)
-_ARR_EQ_DECL(f, float)
-_ARR_EQ_DECL(d, double)
 #undef _ARR_EQ_DECL
 
 #define _EQ_EXPR(A, B)                                                          \
@@ -81,29 +74,6 @@ _ARR_EQ_DECL(d, double)
     char*:       strcomp(((char*)(uintptr_t)(A)), ((char*)(uintptr_t)(B))) == 0, \
     const char*: strcomp(((char*)(uintptr_t)(A)), ((char*)(uintptr_t)(B))) == 0, \
     default: A == B)                                                            \
-)
-
-#define _ARRAY_EQ_EXPR(A, B, LEN)                                             \
-(_Generic((A),                                                                \
-    void*:              memcmp((void*)A,             (void*)B, LEN) == 0,     \
-    char*:              strncmp((char*)(A),          (char*)(B), LEN) == 0,   \
-    char[LEN]:          strncmp((char*)A,            (char*)B, LEN) == 0,     \
-    const char*:        strncmp((char*)(A),          (char*)(B), LEN) == 0,   \
-    char**:             arr_eq_s((char**)A,          (char**)B, LEN),         \
-    char*[LEN]:         arr_eq_s((char**)A,          (char**)B, LEN),         \
-    int*:               arr_eq_i((int*)A,            (int*)B, LEN),           \
-    int[LEN]:           arr_eq_i((int*)A,            (int*)B, LEN),           \
-    unsigned int*:      arr_eq_ui((unsigned int*)A,  (unsigned int*)B, LEN),  \
-    unsigned int[LEN]:  arr_eq_ui((unsigned int*)A,  (unsigned int*)B, LEN),  \
-    long*:              arr_eq_l((long*)A,           (long*)B, LEN),          \
-    long[LEN]:          arr_eq_l((long*)A,           (long*)B, LEN),          \
-    unsigned long*:     arr_eq_ul((unsigned long*)A, (unsigned long*)B, LEN), \
-    unsigned long[LEN]: arr_eq_ul((unsigned long*)A, (unsigned long*)B, LEN), \
-    float*:             arr_eq_f((float*)A,          (float*)B, LEN),         \
-    float[LEN]:         arr_eq_f((float*)A,          (float*)B, LEN),         \
-    double*:            arr_eq_d((double*)A,         (double*)B, LEN),        \
-    double[LEN]:        arr_eq_d((double*)A,         (double*)B, LEN),        \
-    default:            memcmp((void*)A,             (void*)B, LEN) == 0)     \
 )
 
 #define _ASSERT_FAIL(exp)\
