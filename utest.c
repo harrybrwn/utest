@@ -1,11 +1,28 @@
 #define _UTEST_IMPL
 #include "utest.h"
+#undef _UTEST_IMPL
 #include <stdarg.h>
 #include <unistd.h>
 
 int n_Tests;
 UTestSuite *_current_test;
 UTestSuite **AllTests;
+
+__attribute__((constructor(101)))
+void __setup(void)
+{
+    AllTests = (UTestSuite**)malloc(0);
+    n_Tests = 0;
+}
+
+__attribute__((destructor))
+void __cleanup(void)
+{
+    for (int i = 0; i < n_Tests; i++) {
+        free(AllTests[i]);
+    }
+    free(AllTests);
+}
 
 static void RunnerInit(UTestRunner*);
 static int RunTest(UTestRunner*);
@@ -77,6 +94,33 @@ static void RunnerInit(UTestRunner* runner)
 {
     runner->fail = RunnerFail;
     runner->warning = utest_warning;
+}
+
+void BuildTestSuite(UTestSuite opt, TestMethod tst, char *name) {
+    if (opt.ignore)
+        return;
+
+    UTestSuite* newtest = malloc(sizeof(UTestSuite));
+    newtest->name = name;
+    newtest->test = tst;
+    newtest->status = 0;
+    newtest->ignore = opt.ignore;
+    newtest->capture_output = opt.capture_output;
+    newtest->output = NULL;
+
+    if (opt.setup != NULL)
+        newtest->setup = opt.setup;
+    else
+        newtest->setup = NULL;
+
+    if (opt.teardown != NULL)
+        newtest->teardown = opt.teardown;
+    else
+        newtest->teardown = NULL;
+
+    AllTests = (UTestSuite**)realloc(
+        AllTests, (n_Tests + 1) * sizeof(UTestSuite*));
+    AllTests[n_Tests++] = newtest;
 }
 
 int assertion_failure(const char* fmt, ...)

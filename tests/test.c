@@ -33,7 +33,7 @@ TEST(should_be_ignored, .ignore = 1)
 
 TEST(warngings)
 {
-    RECORD_OUTPUT(output) {
+    CATCH_OUTPUT(output) {
         utest->warning("this is a warning\n");
         utest->warning("second one");
     }
@@ -343,7 +343,7 @@ TEST(output_capture_test, .ignore = 0)
 
 TEST(capture_overflow) // to make sure that my buffers dont overflow when im capturing output
 {
-    RECORD_OUTPUT(buf) {
+    CATCH_OUTPUT(buf) {
         for (int i = 0; i < 500; i++)
             printf("%c", 'k');
     }
@@ -353,7 +353,7 @@ TEST(capture_overflow) // to make sure that my buffers dont overflow when im cap
     expected[500] = '\0';
     eq((char*)expected, buf);
 
-    RECORD_OUTPUT(buf2) {
+    CATCH_OUTPUT(buf2) {
         printf("what");
     }
     eq(buf2, "what");

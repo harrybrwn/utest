@@ -4,3 +4,7 @@
 # Build/Test
 tests/test
 *.o
+*.out
+*.gcov
+*.gcno
+*.gcda

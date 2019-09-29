@@ -35,14 +35,14 @@ typedef struct utest_runner
     AssertionMsgFunc warning;
 } UTestRunner;
 
-extern int n_Tests;
 extern UTestSuite *_current_test;
-extern UTestSuite **AllTests;
 
 // 8 bit unsigned integer.
 typedef unsigned int byte_t __attribute__((__mode__(QI)));
 
 int RunTests(void);
+
+void BuildTestSuite(UTestSuite, TestMethod, char *);
 
 int assertion_failure(const char* fmt, ...);
 int utest_warning(const char* fmt, ...);
@@ -130,8 +130,8 @@ int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
 #define eqn(A, B, L)     assert_eqn(A, B, L)
 #define not_eqn(A, B, L) assert_not_eqn(A, B, L)
 
-#define _TEST_NAME(NAME) _utest_##NAME
-#define _TEST_DECL(NAME) void _TEST_NAME(NAME)(UTestRunner* utest __attribute__((unused)))
+#define TEST_NAME(NAME) _utest_test_##NAME
+#define _TEST_DECL(NAME) void TEST_NAME(NAME)(UTestRunner* utest __attribute__((unused)))
 
 /**
  * The TEST macro is what creates a test.
@@ -151,39 +151,16 @@ int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
  *      assert(false);
  *  }
  */
-#define TEST(NAME, ...)                                   \
-    _TEST_DECL(NAME);                                     \
-    __attribute__((constructor))                          \
-    void _add_##NAME##_to_tests(void) {                   \
-        UTestSuite temp = { __VA_ARGS__ };                \
-                                                          \
-        UTestSuite* newtest = malloc(sizeof(UTestSuite)); \
-        newtest->name = #NAME;                            \
-        newtest->test = _TEST_NAME(NAME);                 \
-        newtest->status = 0;                              \
-        newtest->ignore = temp.ignore;                    \
-        newtest->capture_output = temp.capture_output;    \
-        newtest->output = NULL;                           \
-                                                          \
-        if (temp.setup != NULL)                           \
-            newtest->setup = temp.setup;                  \
-        else                                              \
-            newtest->setup = NULL;                        \
-        if (temp.teardown != NULL)                        \
-            newtest->teardown = temp.teardown;            \
-        else                                              \
-            newtest->teardown = NULL;                     \
-        if (!temp.ignore) {                               \
-            AllTests = (UTestSuite**)realloc(             \
-                AllTests,                                 \
-                (n_Tests + 1) * sizeof(UTestSuite*));     \
-            AllTests[n_Tests++] = newtest;                \
-        } else                                            \
-            free(newtest);                                \
-    }                                                     \
+#define TEST(NAME, ...)                              \
+    _TEST_DECL(NAME);                                \
+    __attribute__((constructor))                     \
+    void _add_##NAME##_to_tests(void) {              \
+        UTestSuite opt = { __VA_ARGS__ };            \
+        BuildTestSuite(opt, TEST_NAME(NAME), #NAME); \
+    }                                                \
     _TEST_DECL(NAME)
 
-#define RECORD_OUTPUT(BUFFER)        \
+#define CATCH_OUTPUT(BUFFER)         \
 char *BUFFER = NULL;                 \
 _current_test->capture_output = 1;   \
 if (_current_test->output != NULL) { \
@@ -191,25 +168,6 @@ if (_current_test->output != NULL) { \
     _current_test->output = NULL;    \
 }                                    \
 while (utest_capture_output(&BUFFER))
-
-#if !defined(_UTEST_IMPL)
-// runs before any tests
-__attribute__((constructor(101)))
-void __setup(void)
-{
-    AllTests = (UTestSuite**)malloc(0);
-    n_Tests = 0;
-}
-
-__attribute__((destructor))
-void __cleanup(void)
-{
-    for (int i = 0; i < n_Tests; i++) {
-        free(AllTests[i]);
-    }
-    free(AllTests);
-}
-#endif /* !defined(_UTEST_IMPL) */
 
 #ifdef __cplusplus
 }
