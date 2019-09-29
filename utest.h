@@ -20,10 +20,12 @@ typedef struct utest_suite
     void (*setup)(void);
     void (*teardown)(void);
     int ignore;
+    int capture_output;
 
     TestMethod test;
     char* name;
     int status;
+    char* output;
 } UTestSuite;
 
 typedef struct utest_runner
@@ -43,9 +45,9 @@ typedef unsigned int byte_t __attribute__((__mode__(QI)));
 int RunTests(void);
 
 int assertion_failure(const char* fmt, ...);
-int assertion_warning(const char* fmt, ...);
+int utest_warning(const char* fmt, ...);
 
-int utest_capture_output(char *buf, size_t len);
+int utest_capture_output(char **buf);
 
 /**
  * Return: 1 for a match, 0 for no match.
@@ -180,16 +182,33 @@ _ARR_EQ_DECL(d, double)
         newtest->test = _TEST_NAME(NAME);                                                    \
         newtest->status = 0;                                                                 \
         newtest->ignore = temp.ignore;                                                       \
-        /*newtest->*/                                                                        \
+        newtest->capture_output = temp.capture_output;                                       \
+        newtest->output = NULL;                                                              \
                                                                                              \
-        if (temp.setup != NULL) { newtest->setup = temp.setup; }                             \
-        if (temp.teardown != NULL) { newtest->teardown = temp.teardown; }                    \
+        if (temp.setup != NULL)                                                              \
+            newtest->setup = temp.setup;                                                     \
+        else                                                                                 \
+            newtest->setup = NULL;                                                           \
+        if (temp.teardown != NULL)                                                           \
+            newtest->teardown = temp.teardown;                                               \
+        else                                                                                 \
+            newtest->teardown = NULL;                                                        \
         if (!temp.ignore) {                                                                  \
             AllTests = (UTestSuite**)realloc(AllTests, (n_Tests + 1) * sizeof(UTestSuite*)); \
             AllTests[n_Tests++] = newtest;                                                   \
-        }                                                                                    \
+        } else                                                                               \
+            free(newtest);                                                                   \
     }                                                                                        \
     _TEST_DECL(NAME)
+
+#define RECORD_OUTPUT(BUFFER)        \
+char *BUFFER = NULL;                 \
+_current_test->capture_output = 1;   \
+if (_current_test->output != NULL) { \
+    free(_current_test->output);     \
+    _current_test->output = NULL;    \
+}                                    \
+while (utest_capture_output(&BUFFER))
 
 #if !defined(_UTEST_IMPL)
 // runs before any tests

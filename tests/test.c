@@ -1,7 +1,17 @@
 #include "utest.h"
 #include "test_cases.h"
 
-TEST(eq) {
+static int setup_counter = 0;
+
+void setUp(void) {
+    setup_counter++;
+}
+
+void tearDown(void) {
+    setup_counter--;
+}
+
+TEST(eq, .setup = setUp) {
     eq(0, 0);
     eq(NULL, NULL);
     char* a = "one";
@@ -11,6 +21,8 @@ TEST(eq) {
     not_eq("eno", b);
     not_eq(b, "eno");
     eqn(a, b, strlen(a));
+
+    eq(setup_counter, 1);
 }
 
 TEST(should_be_ignored, .ignore = 1)
@@ -19,7 +31,7 @@ TEST(should_be_ignored, .ignore = 1)
     exit(1);
 }
 
-TEST(bin_compare)
+TEST(bin_compare, .setup = setUp)
 {
     {
         __typeof__("one") _left = "one";
@@ -89,7 +101,7 @@ TEST(bin_compare)
         int* left = malloc(5 * sizeof(int));
         int* right = malloc(5 * sizeof(int));
         for (int i = 0; i < 5; i++)  { left[i] = i; }
-        for (int i = 5; i >= 0; i--) { right[i] = i; }
+        for (int i = 4; i >= 0; i--) { right[i] = i; }
 
         __typeof__(left) _l = left;
         __typeof__(right) _r = right;
@@ -100,6 +112,8 @@ TEST(bin_compare)
             assertion_failure("(%s:%d) binary compare returned unexpected result\n", __FILE__, __LINE__);
             runner->current_test->status += 1;
         }
+        free(left);
+        free(right);
     }
 
     {
@@ -120,9 +134,10 @@ TEST(bin_compare)
             runner->current_test->status += 1;
         }
     }
+    eq(setup_counter, 2);
 }
 
-TEST(assert_equal)
+TEST(assert_equal, .teardown = tearDown)
 {
     assert_eq(0, 0);
     for (int i = 0; i < 5; i++) {
@@ -170,10 +185,6 @@ TEST(factorial)
     eq(fac(-10), 1);
 }
 
-#pragma GCC diagnostic push
-// for the string comparisons in the default case in assert_eq
-#pragma GCC diagnostic ignored "-Waddress"
-
 TEST(utest_tests)
 {
     assert_eq("one", "one");
@@ -184,9 +195,9 @@ TEST(utest_tests)
 
     char *what = "some text";
     eq(what, "some text");
-}
 
-#pragma GCC diagnostic pop
+    eq(setup_counter, 1);
+}
 
 TEST(arr_equals_int)
 {
@@ -284,42 +295,112 @@ int testing = 0;
 
 TEST(output_capture_test, .ignore = 0)
 {
-    char buf[256];
+    {
+        char *buf = NULL;
+        assert(utest_capture_output(NULL) == 1);
+        printf("hello");
+        assert(utest_capture_output(&buf) == 0);
+        assert(buf != NULL);
+        eqn(buf, "hello", 6);
+        free(buf);
+    }
 
-    assert(utest_capture_output(NULL, 0) == 1);
-    printf("hello");
-    assert(utest_capture_output(buf, 256) == 0);
-    assert_eqn(buf, "hello", 6);
+    {
+        char *buf = NULL;
+        assert(utest_capture_output(&buf) == 1);
+        printf("this is a test\n");
+        printf("for multi-line...\n");
+        printf("output captures");
+        assert(utest_capture_output(&buf) == 0);
+        eq((char*)buf,
+            "this is a test\n"
+            "for multi-line...\n"
+            "output captures"
+        );
+        free(buf);
+    }
 
-    bzero(buf, 256);
-
-    assert(utest_capture_output(buf, 256) == 1);
-    printf("this is a test\n");
-    printf("for multi-line...\n");
-    printf("output captures");
-    assert(utest_capture_output(buf, 256) == 0);
-    // eq(buf,
-    //     "this is a test\n"
-    //     "for multi-line...\n"
-    //     "output captures"
-    // );
+    {
+        char *output = NULL;
+        while (utest_capture_output(&output)) {
+            printf("output");
+            printf("output");
+        }
+        eq(output, "outputoutput");
+        free(output);
+    }
 }
 
 TEST(stuff, .ignore = 1)
 {
     printf("\n");
 
-    char buf[256];
-    utest_capture_output(NULL, 0);
+    char *buf;
+    utest_capture_output(NULL);
 
     printf("capturing output...\n");
     printf("is this even working !!!!!!!!!!!!!!\n");
 
-    utest_capture_output(buf, 256);
+    utest_capture_output(&buf);
 
     printf("buffer('\n");
     for (int i = 0; (i < 256) && (buf[i] != '\0'); i++) {
         printf("%c", buf[i]);
     }
     printf("')\n");
+    free(buf);
+}
+
+TEST(capture_overflow) // to make sure that my buffers dont overflow when im capturing output
+{
+    RECORD_OUTPUT(buf) {
+        for (int i = 0; i < 500; i++)
+            printf("%c", 'k');
+    }
+
+    char expected[501];
+    memset(expected, 'k', 500);
+    expected[500] = '\0';
+    eq((char*)expected, buf);
+
+    RECORD_OUTPUT(buf2) {
+        printf("what");
+    }
+    eq(buf2, "what");
+}
+
+#include <unistd.h>
+
+size_t read_util(int fd, char** buffer);
+
+TEST(more_stuff, .ignore=1)
+{
+    int stdout_save = -1;
+    int outpipe[2] = {-1, -1};
+    fflush(stdout);
+    if ((stdout_save = dup(STDOUT_FILENO)) == -1) {
+        fprintf(stderr, "couldn't copy stdout\n");
+        exit(1);
+    }
+    if (pipe(outpipe) != 0)
+        fprintf(stderr, "couldn't create output capture pipe\n");
+    if (dup2(outpipe[1], STDOUT_FILENO) == -1)
+        fprintf(stderr, "couldn't rediect stdout to pipe\n");
+
+    printf("testing1... testing2...");
+    printf("%c", '\0');
+
+    fflush(stdout);
+    write(outpipe[1], "", 1);
+    close(outpipe[1]);
+    dup2(stdout_save, STDOUT_FILENO);
+
+    char *buffer = NULL;
+    read_util(outpipe[0], &buffer);
+    close(outpipe[0]);
+
+    printf("\n");
+    printf("buffer: %s", buffer);
+
+    free(buffer);
 }
