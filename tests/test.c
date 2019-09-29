@@ -4,10 +4,19 @@
 TEST(eq) {
     eq(0, 0);
     eq(NULL, NULL);
-    // char* a = "one";
-    // eq("one", a);
-    // char* b = "one";
-    // eq(b, "one");
+    char* a = "one";
+    eq("one", a);
+    char* b = "one";
+    eq(b, "one");
+    not_eq("eno", b);
+    not_eq(b, "eno");
+    eqn(a, b, strlen(a));
+}
+
+TEST(should_be_ignored, .ignore = 1)
+{
+    _ASSERT_FAIL("this test should not run!");
+    exit(1);
 }
 
 TEST(bin_compare)
@@ -181,15 +190,24 @@ TEST(utest_tests)
 
 TEST(arr_equals_int)
 {
-    int stack_arr[] = {1, 2, 3, 4, 5, 6};
-    int *arr = malloc(6 * sizeof(int));
-    for (int i = 0; i < 6; i++)
-        arr[i] = stack_arr[i];
-    assert_eqn(arr, arr, 6);
-    free(arr);
+    {
+        int stack_arr[] = {1, 2, 3, 4, 5, 6};
+        int *arr = malloc(6 * sizeof(int));
+        for (int i = 0; i < 6; i++)
+            arr[i] = stack_arr[i];
+        assert_eqn(arr, arr, 6);
+        free(arr);
+        int a[] = {1, 2, 3, 4 , 5, 6};
+        assert_eqn(a, stack_arr, 6);
+    }
 
-    int a[] = {1, 2, 3, 4 , 5, 6};
-    assert_eqn(a, stack_arr, 6);
+    {
+        int arr[] = {5, 4, 3, 2, 1};
+        int arr2[] = {1, 2, 3, 4, 5};
+        assert_not_eqn(arr, arr2, sizeof(arr)/sizeof(int));
+        int arr3[] = {5, 4, 3, 2, 1};
+        eqn(arr, arr3, sizeof(arr)/sizeof(int));
+    }
 }
 
 TEST(arr_equals_float)
@@ -214,6 +232,22 @@ TEST(arr_equals_string)
     not_eqn(arr, arr3, 3);
 }
 
+TEST(assert_equals_string)
+{
+    char *base_str = "one";
+    eq(base_str, "one");
+    eq("one", base_str);
+
+    char buf[4];
+    for (int i = 0; i < 4; i++)
+        buf[i] = base_str[i];
+    eq(base_str, (char*)buf);
+    eq((char*)buf, base_str);
+    eq("one", (char*)buf);
+    eq((char*)buf, "one");
+    eq("one", "one");
+}
+
 TEST(struct_equals)
 {
     struct test {
@@ -229,11 +263,63 @@ TEST(struct_equals)
     memset(&a, 0, sizeof(struct test));
     memset(&b, 0, sizeof(struct test));
     a.a = 1;
+    a.b = 5.9f;
+    a.inner.size = 20;
     b.a = 1;
+    b.b = 5.9f;
+    b.inner.size = 20;
 
     eq(a.a, a.a);
     eqn(&a, &b, sizeof(struct test));
 
+    int res = binary_compare((byte_t*)(uintptr_t)&a, (byte_t*)(uintptr_t)&b, sizeof(struct test));
+    assert(res == 1);
+    eq(res, 1); // just for the extra milage
+
     b.inner.size = 200;
     not_eqn(&a, &b, sizeof(struct test));
+}
+
+int testing = 0;
+
+TEST(output_capture_test, .ignore = 0)
+{
+    char buf[256];
+
+    assert(utest_capture_output(NULL, 0) == 1);
+    printf("hello");
+    assert(utest_capture_output(buf, 256) == 0);
+    assert_eqn(buf, "hello", 6);
+
+    bzero(buf, 256);
+
+    assert(utest_capture_output(buf, 256) == 1);
+    printf("this is a test\n");
+    printf("for multi-line...\n");
+    printf("output captures");
+    assert(utest_capture_output(buf, 256) == 0);
+    // eq(buf,
+    //     "this is a test\n"
+    //     "for multi-line...\n"
+    //     "output captures"
+    // );
+}
+
+TEST(stuff, .ignore = 1)
+{
+    printf("\n");
+
+    char buf[256];
+    utest_capture_output(NULL, 0);
+
+    printf("capturing output...\n");
+    printf("is this even working !!!!!!!!!!!!!!\n");
+
+    utest_capture_output(buf, 256);
+
+    printf("buffer('\n");
+    for (int i = 0; (i < 256) && (buf[i] != '\0'); i++) {
+        printf("%c", buf[i]);
+    }
+    printf("')\n");
 }

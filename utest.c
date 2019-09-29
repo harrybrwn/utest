@@ -1,23 +1,23 @@
 #define _UTEST_IMPL
 #include "utest.h"
 #include <stdarg.h>
+#include <unistd.h>
 
-extern int n_Tests;
-extern UTestSuite *_current_test;
-extern UTestSuite **AllTests;
+int n_Tests;
+UTestSuite *_current_test;
+UTestSuite **AllTests;
 
 static void RunnerInit(UTestRunner*);
-
 
 #define COL_OK      "\x1b[1;32m"
 #define COL_WARNING "\x1b[1;35m"
 #define COL_ERROR   "\x1b[1;31m"
 #define COL_RESET   "\x1b[0m"
-
 #define MSG_OK   COL_OK "Ok" COL_RESET
 #define MSG_ERR  COL_ERROR "Fail" COL_RESET
 
-int RunTests(void) {
+int RunTests(void)
+{
     int status = 0;
     UTestRunner runner;
     RunnerInit(&runner);
@@ -26,7 +26,8 @@ int RunTests(void) {
     {
         _current_test = AllTests[i];
         runner.current_test = AllTests[i];
-        _current_test->test(&runner);
+        if (!_current_test->ignore)
+            _current_test->test(&runner);
 
         if (_current_test->status != 0)
             status += 1;
@@ -81,6 +82,46 @@ int assertion_warning(const char* fmt, ...)
     vfprintf(stderr, fmtbuf, args);
     va_end(args);
     return 1;
+}
+
+int utest_capture_output(char *buf, size_t len)
+{
+    static int init = 1;
+    static int stdout_save = -1;
+    static int outpipe[2] = {-1, -1};
+
+    fflush(stdout);
+    if (init) // initialize output capture
+    {
+        if ((stdout_save = dup(STDOUT_FILENO)) == -1) {
+            fprintf(stderr, "couldn't copy stdout\n");
+            exit(1);
+        }
+
+        if (pipe(outpipe) != 0)
+            fprintf(stderr, "couldn't create output capture pipe\n");
+        if (dup2(outpipe[1], STDOUT_FILENO) == -1)
+            fprintf(stderr, "couldn't rediect stdout to pipe\n");
+        close(outpipe[1]);
+
+        init = 0; // done with initialization
+        return 1;
+    }
+    else // end output capture
+    {
+        ssize_t readlen;
+        if ((readlen = read(outpipe[0], buf, len - 1)) < 0)
+            fprintf(stderr, "read error\n");
+        // buf[readlen] = '\0';
+
+        if (dup2(stdout_save, STDOUT_FILENO) == -1)
+            fprintf(stderr, "couldn't reset stdout\n");
+
+        init = 1; // should run init stage next time capture_output is run
+        outpipe[1] = -1; outpipe[0] = -1;
+        stdout_save = -1;
+        return 0;
+    }
 }
 
 /**
