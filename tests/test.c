@@ -27,8 +27,20 @@ TEST(eq, .setup = setUp) {
 
 TEST(should_be_ignored, .ignore = 1)
 {
-    _ASSERT_FAIL("this test should not run!");
+    FAIL("this test should not run!");
     exit(1);
+}
+
+TEST(warngings)
+{
+    RECORD_OUTPUT(output) {
+        utest->warning("this is a warning\n");
+        utest->warning("second one");
+    }
+
+    char *expected = "\x1b[1;35mTest Warning:\x1b[0m this is a warning\n"
+                     "\x1b[1;35mTest Warning:\x1b[0m second one";
+    eq(output, expected);
 }
 
 TEST(bin_compare, .setup = setUp)
@@ -41,7 +53,7 @@ TEST(bin_compare, .setup = setUp)
                                  sizeof(_left));
         if (res) {
             assertion_failure("(%s:%d) binary compare returned unexpected result\n", __FILE__, __LINE__);
-            runner->current_test->status += 1;
+            utest->test->status += 1;
         }
     }
 
@@ -53,7 +65,7 @@ TEST(bin_compare, .setup = setUp)
                                  sizeof(_l));
         if (!res) {
             assertion_failure("(%s:%d) binary compare returned unexpected result\n", __FILE__, __LINE__);
-            runner->current_test->status += 1;
+            utest->test->status += 1;
         }
     }
 
@@ -65,7 +77,7 @@ TEST(bin_compare, .setup = setUp)
                                  sizeof(_r));
         if (!res) {
             assertion_failure("(%s:%d) binary compare returned unexpected result\n", __FILE__, __LINE__);
-            runner->current_test->status += 1;
+            utest->test->status += 1;
         }
     }
 
@@ -77,7 +89,7 @@ TEST(bin_compare, .setup = setUp)
                                  sizeof(_l));
         if (res) {
             assertion_failure("(%s:%d) binary compare returned unexpected result\n", __FILE__, __LINE__);
-            runner->current_test->status += 1;
+            utest->test->status += 1;
         }
     }
 
@@ -92,7 +104,7 @@ TEST(bin_compare, .setup = setUp)
                                  sizeof(_r));
         if (!res) {
             assertion_failure("(%s:%d) binary compare returned unexpected result\n", __FILE__, __LINE__);
-            runner->current_test->status += 1;
+            utest->test->status += 1;
         }
         free(ptr);
     }
@@ -110,7 +122,7 @@ TEST(bin_compare, .setup = setUp)
                                  sizeof(_l));
         if (res) {
             assertion_failure("(%s:%d) binary compare returned unexpected result\n", __FILE__, __LINE__);
-            runner->current_test->status += 1;
+            utest->test->status += 1;
         }
         free(left);
         free(right);
@@ -131,7 +143,7 @@ TEST(bin_compare, .setup = setUp)
                                  sizeof(_l));
         if (!res) {
             assertion_failure("(%s:%d) binary compare returned unexpected result\n", __FILE__, __LINE__);
-            runner->current_test->status += 1;
+            utest->test->status += 1;
         }
     }
     eq(setup_counter, 2);
@@ -291,8 +303,6 @@ TEST(struct_equals)
     not_eqn(&a, &b, sizeof(struct test));
 }
 
-int testing = 0;
-
 TEST(output_capture_test, .ignore = 0)
 {
     {
@@ -331,26 +341,6 @@ TEST(output_capture_test, .ignore = 0)
     }
 }
 
-TEST(stuff, .ignore = 1)
-{
-    printf("\n");
-
-    char *buf;
-    utest_capture_output(NULL);
-
-    printf("capturing output...\n");
-    printf("is this even working !!!!!!!!!!!!!!\n");
-
-    utest_capture_output(&buf);
-
-    printf("buffer('\n");
-    for (int i = 0; (i < 256) && (buf[i] != '\0'); i++) {
-        printf("%c", buf[i]);
-    }
-    printf("')\n");
-    free(buf);
-}
-
 TEST(capture_overflow) // to make sure that my buffers dont overflow when im capturing output
 {
     RECORD_OUTPUT(buf) {
@@ -371,9 +361,9 @@ TEST(capture_overflow) // to make sure that my buffers dont overflow when im cap
 
 #include <unistd.h>
 
-size_t read_util(int fd, char** buffer);
+size_t pipe_read_util(int fd, char** buffer);
 
-TEST(more_stuff, .ignore=1)
+TEST(read_util_func)
 {
     int stdout_save = -1;
     int outpipe[2] = {-1, -1};
@@ -387,20 +377,18 @@ TEST(more_stuff, .ignore=1)
     if (dup2(outpipe[1], STDOUT_FILENO) == -1)
         fprintf(stderr, "couldn't rediect stdout to pipe\n");
 
-    printf("testing1... testing2...");
-    printf("%c", '\0');
+    printf("testing...");
 
     fflush(stdout);
     write(outpipe[1], "", 1);
     close(outpipe[1]);
     dup2(stdout_save, STDOUT_FILENO);
 
-    char *buffer = NULL;
-    read_util(outpipe[0], &buffer);
+    char* buffer = NULL;
+
+    eq((size_t)11, pipe_read_util(outpipe[0], &buffer));
+    eq(buffer, "testing...");
+
     close(outpipe[0]);
-
-    printf("\n");
-    printf("buffer: %s", buffer);
-
     free(buffer);
 }

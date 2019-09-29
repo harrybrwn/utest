@@ -8,6 +8,7 @@ UTestSuite *_current_test;
 UTestSuite **AllTests;
 
 static void RunnerInit(UTestRunner*);
+static int RunTest(UTestRunner*);
 
 #define COL_OK      "\x1b[1;32m"
 #define COL_WARNING "\x1b[1;35m"
@@ -29,23 +30,10 @@ int RunTests(void)
             continue;
         }
 
-        runner.current_test = AllTests[i];
-
-        if (_current_test->setup != NULL)
-            _current_test->setup();
-
-        _current_test->test(&runner);
-
-        if (_current_test->teardown != NULL)
-            _current_test->teardown();
-
-        if (_current_test->capture_output == 1)
-            free(_current_test->output);
-
-        if (_current_test->status != 0)
-            status += 1;
-        printf(".");
+        runner.test = AllTests[i];
+        status += RunTest(&runner);
     }
+    _current_test = NULL;
 
     if (status == 0)
         printf("\n" MSG_OK ": %d of %d tests passed\n", n_Tests - status, n_Tests);
@@ -53,6 +41,24 @@ int RunTests(void)
         printf("\n" MSG_FAIL ": %d of %d tests passed\n", n_Tests - status, n_Tests);
 
     return status;
+}
+
+static int RunTest(UTestRunner* r) {
+    if (r->test->setup != NULL)
+        r->test->setup();
+
+    r->test->test(r);
+
+    if (r->test->teardown != NULL)
+        r->test->teardown();
+
+    if (r->test->capture_output)
+        free(r->test->output);
+    if (r->test->status == 0)
+        printf(".");
+    else
+        printf("x");
+    return r->test->status;
 }
 
 static int RunnerFail(const char* fmt, ...)
@@ -92,12 +98,12 @@ int utest_warning(const char* fmt, ...)
     snprintf(fmtbuf, sizeof(fmtbuf), COL_WARNING "Test Warning:" COL_RESET " %s", fmt);
 
     va_start(args, fmt);
-    vfprintf(stderr, fmtbuf, args);
+    vfprintf(stdout, fmtbuf, args);
     va_end(args);
     return 1;
 }
 
-size_t read_util(int fd, char** buffer) {
+size_t pipe_read_util(int fd, char** buffer) {
     char buf[256];
     size_t buffer_len = 0;
     size_t read_count = read(fd, buf, sizeof(buf)-1);
@@ -105,7 +111,6 @@ size_t read_util(int fd, char** buffer) {
     if (read_count > 0) {
         if (*buffer == NULL) {
             *buffer = malloc(read_count + 1);
-            _current_test->output = *buffer;
         }
         memcpy(*buffer, buf, read_count + 1);
     }
@@ -117,7 +122,6 @@ size_t read_util(int fd, char** buffer) {
 
         *buffer = realloc(*buffer, buffer_len + 1);
         memcpy(*buffer + buffer_len - read_count, buf, read_count + 1);
-        _current_test->output = *buffer;
     }
     return buffer_len;
 }
@@ -145,17 +149,13 @@ int utest_capture_output(char **buf)
     }
     else // end output capture
     {
-        int terminated = write(outpipe[1], "", 1) == 1;
+        write(outpipe[1], "", 1);
         close(outpipe[1]);
 
         dup2(stdout_save, STDOUT_FILENO);
 
-        if (terminated) {
-            // ssize_t readlen;
-            // if ((readlen = read(outpipe[0], buf, len - 1)) < 0)
-            //     fprintf(stderr, "read error\n");
-            read_util(outpipe[0], buf);
-        }
+        pipe_read_util(outpipe[0], buf);
+        _current_test->output = *buf;
         close(outpipe[0]);
 
         init = 1; // should run init stage next time capture_output is run
@@ -177,7 +177,7 @@ int binary_compare(byte_t* left, byte_t* right, size_t len) {
     return 1;
 }
 
-#define _ARR_EQ_IMPL(SUFFIX, TYPE)\
+#define _ARR_EQ_IMPL(SUFFIX, TYPE)                              \
 int arr_unordered_eq_##SUFFIX(TYPE *a1, TYPE *a2, size_t len) { \
     for (size_t i = 0; i < len; i++) {                          \
         for (size_t k = 0; k < len; k++) {                      \

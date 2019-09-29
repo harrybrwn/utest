@@ -30,7 +30,7 @@ typedef struct utest_suite
 
 typedef struct utest_runner
 {
-    UTestSuite* current_test;
+    UTestSuite* test;
     AssertionMsgFunc fail;
     AssertionMsgFunc warning;
 } UTestRunner;
@@ -64,25 +64,35 @@ int main(void) {
 }
 #endif /* AUTOTEST && _MAIN_DEFINED && _UTEST_IMPL */
 
+#define _UTEST_PRINT_FMT(A)\
+    (_Generic((A),         \
+        char*: "%s",       \
+        const char*: "%s", \
+        int: "%d"))
+
 #define _ARR_EQ_DECL(SUFFIX, TYPE)                   \
 int arr_unordered_eq_##SUFFIX(TYPE*, TYPE*, size_t); \
 int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
 #undef _ARR_EQ_DECL
 
-#define _EQ_EXPR(A, B)                                                          \
-(_Generic((A),                                                                  \
+#define _EQ_EXPR(A, B)                                                           \
+(_Generic((A),                                                                   \
     char*:       strcomp(((char*)(uintptr_t)(A)), ((char*)(uintptr_t)(B))) == 0, \
     const char*: strcomp(((char*)(uintptr_t)(A)), ((char*)(uintptr_t)(B))) == 0, \
-    default: A == B)                                                            \
+    default: A == B)                                                             \
 )
 
-#define _ASSERT_FAIL(exp)\
+#define FAIL(EXP)                                                       \
     (_current_test->status += assertion_failure("TEST(%s) %s:%d '%s'\n",\
-                _current_test->name, __FILE__, __LINE__, exp))
+                _current_test->name, __FILE__, __LINE__, EXP))
+
+#define _ASSERT_FAIL(LEFT, OP, RIGHT) \
+    (_current_test->status += assertion_failure("TEST(%s) %s:%d '%s'\n",\
+                _current_test->name, __FILE__, __LINE__, #LEFT OP #RIGHT))
 
 #ifndef assert
 #undef assert
-#define assert(exp) (exp) ? ((void)0) : _ASSERT_FAIL(#exp);
+#define assert(exp) (exp) ? ((void)0) : FAIL(#exp)
 #endif
 
 #define assert_eq(A, B)               \
@@ -90,14 +100,14 @@ int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
     __typeof__(B) _B = B;             \
     (_EQ_EXPR(_A, _B)) ?              \
         ((void)0) :                   \
-        _ASSERT_FAIL(#A " == " #B);})
+        _ASSERT_FAIL(A, " == ", B);})
 
 #define assert_not_eq(A, B)  \
     ({__typeof__(A) _A = A;  \
     __typeof__(B) _B   = B;  \
     (!_EQ_EXPR(_A, _B)) ?    \
         ((void)0) :          \
-        _ASSERT_FAIL(#A " != " #B);})
+        _ASSERT_FAIL(A, " != ", B);})
 
 /**
  * assert that the memory stored at two address for length `LEN` are equal
@@ -105,7 +115,7 @@ int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
 #define assert_eqn(A, B, LEN)     \
     (binary_compare((byte_t*)(uintptr_t)A, (byte_t*)(uintptr_t)B, LEN)) ? \
         ((void)0) :               \
-        _ASSERT_FAIL(#A " == " #B)
+        _ASSERT_FAIL(A, " == ", B)
 
 /**
  * assert that the memory stored at two address for length `LEN` are not equal
@@ -113,7 +123,7 @@ int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
 #define assert_not_eqn(A, B, LEN)  \
     (!binary_compare((byte_t*)(uintptr_t)A, (byte_t*)(uintptr_t)B, LEN)) ? \
         ((void)0) :                \
-        _ASSERT_FAIL(#A " != " #B)
+        _ASSERT_FAIL(A, " != ", B)
 
 #define eq(A, B)         assert_eq(A, B)
 #define not_eq(A, B)     assert_not_eq(A, B)
@@ -121,7 +131,7 @@ int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
 #define not_eqn(A, B, L) assert_not_eqn(A, B, L)
 
 #define _TEST_NAME(NAME) _utest_##NAME
-#define _TEST_DECL(NAME) void _TEST_NAME(NAME)(UTestRunner* runner __attribute__((unused)))
+#define _TEST_DECL(NAME) void _TEST_NAME(NAME)(UTestRunner* utest __attribute__((unused)))
 
 /**
  * The TEST macro is what creates a test.
@@ -141,34 +151,36 @@ int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
  *      assert(false);
  *  }
  */
-#define TEST(NAME, ...)                                                                      \
-    _TEST_DECL(NAME);                                                                        \
-    __attribute__((constructor))                                                             \
-    void _add_##NAME##_to_tests(void) {                                                      \
-        UTestSuite temp = { __VA_ARGS__ };                                                   \
-                                                                                             \
-        UTestSuite* newtest = malloc(sizeof(UTestSuite));                                    \
-        newtest->name = #NAME;                                                               \
-        newtest->test = _TEST_NAME(NAME);                                                    \
-        newtest->status = 0;                                                                 \
-        newtest->ignore = temp.ignore;                                                       \
-        newtest->capture_output = temp.capture_output;                                       \
-        newtest->output = NULL;                                                              \
-                                                                                             \
-        if (temp.setup != NULL)                                                              \
-            newtest->setup = temp.setup;                                                     \
-        else                                                                                 \
-            newtest->setup = NULL;                                                           \
-        if (temp.teardown != NULL)                                                           \
-            newtest->teardown = temp.teardown;                                               \
-        else                                                                                 \
-            newtest->teardown = NULL;                                                        \
-        if (!temp.ignore) {                                                                  \
-            AllTests = (UTestSuite**)realloc(AllTests, (n_Tests + 1) * sizeof(UTestSuite*)); \
-            AllTests[n_Tests++] = newtest;                                                   \
-        } else                                                                               \
-            free(newtest);                                                                   \
-    }                                                                                        \
+#define TEST(NAME, ...)                                   \
+    _TEST_DECL(NAME);                                     \
+    __attribute__((constructor))                          \
+    void _add_##NAME##_to_tests(void) {                   \
+        UTestSuite temp = { __VA_ARGS__ };                \
+                                                          \
+        UTestSuite* newtest = malloc(sizeof(UTestSuite)); \
+        newtest->name = #NAME;                            \
+        newtest->test = _TEST_NAME(NAME);                 \
+        newtest->status = 0;                              \
+        newtest->ignore = temp.ignore;                    \
+        newtest->capture_output = temp.capture_output;    \
+        newtest->output = NULL;                           \
+                                                          \
+        if (temp.setup != NULL)                           \
+            newtest->setup = temp.setup;                  \
+        else                                              \
+            newtest->setup = NULL;                        \
+        if (temp.teardown != NULL)                        \
+            newtest->teardown = temp.teardown;            \
+        else                                              \
+            newtest->teardown = NULL;                     \
+        if (!temp.ignore) {                               \
+            AllTests = (UTestSuite**)realloc(             \
+                AllTests,                                 \
+                (n_Tests + 1) * sizeof(UTestSuite*));     \
+            AllTests[n_Tests++] = newtest;                \
+        } else                                            \
+            free(newtest);                                \
+    }                                                     \
     _TEST_DECL(NAME)
 
 #define RECORD_OUTPUT(BUFFER)        \
