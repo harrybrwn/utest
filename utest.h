@@ -15,7 +15,7 @@ struct utest_runner;
 typedef void (*TestMethod)(struct utest_runner*);
 typedef int (*AssertionMsgFunc)(const char*, ...);
 
-typedef struct utest_suite
+typedef struct utest_case
 {
     void (*setup)(void);
     void (*teardown)(void);
@@ -26,23 +26,23 @@ typedef struct utest_suite
     char* name;
     int status;
     char* output;
-} UTestSuite;
+} UTestCase;
 
 typedef struct utest_runner
 {
-    UTestSuite* test;
+    UTestCase* test;
     AssertionMsgFunc fail;
     AssertionMsgFunc warning;
 } UTestRunner;
 
-extern UTestSuite *_current_test;
+extern UTestCase *_current_test;
 
 // 8 bit unsigned integer.
 typedef unsigned int byte_t __attribute__((__mode__(QI)));
 
 int RunTests(void);
 
-void BuildTestSuite(UTestSuite, TestMethod, char *);
+void BuildTestCase(UTestCase, TestMethod, char *);
 
 int assertion_failure(const char* fmt, ...);
 int utest_warning(const char* fmt, ...);
@@ -151,13 +151,13 @@ int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
  *      assert(false);
  *  }
  */
-#define TEST(NAME, ...)                              \
-    _TEST_DECL(NAME);                                \
-    __attribute__((constructor))                     \
-    void _add_##NAME##_to_tests(void) {              \
-        UTestSuite opt = { __VA_ARGS__ };            \
-        BuildTestSuite(opt, TEST_NAME(NAME), #NAME); \
-    }                                                \
+#define TEST(NAME, ...)                             \
+    _TEST_DECL(NAME);                               \
+    __attribute__((constructor))                    \
+    void _add_##NAME##_to_tests(void) {             \
+        UTestCase opt = { __VA_ARGS__ };            \
+        BuildTestCase(opt, TEST_NAME(NAME), #NAME); \
+    }                                               \
     _TEST_DECL(NAME)
 
 #define CATCH_OUTPUT(BUFFER)         \

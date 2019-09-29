@@ -5,13 +5,13 @@
 #include <unistd.h>
 
 int n_Tests;
-UTestSuite *_current_test;
-UTestSuite **AllTests;
+UTestCase *_current_test;
+UTestCase **AllTests;
 
 __attribute__((constructor(101)))
 void __setup(void)
 {
-    AllTests = (UTestSuite**)malloc(0);
+    AllTests = (UTestCase**)malloc(0);
     n_Tests = 0;
 }
 
@@ -96,11 +96,11 @@ static void RunnerInit(UTestRunner* runner)
     runner->warning = utest_warning;
 }
 
-void BuildTestSuite(UTestSuite opt, TestMethod tst, char *name) {
+void BuildTestCase(UTestCase opt, TestMethod tst, char *name) {
     if (opt.ignore)
         return;
 
-    UTestSuite* newtest = malloc(sizeof(UTestSuite));
+    UTestCase* newtest = malloc(sizeof(UTestCase));
     newtest->name = name;
     newtest->test = tst;
     newtest->status = 0;
@@ -118,8 +118,8 @@ void BuildTestSuite(UTestSuite opt, TestMethod tst, char *name) {
     else
         newtest->teardown = NULL;
 
-    AllTests = (UTestSuite**)realloc(
-        AllTests, (n_Tests + 1) * sizeof(UTestSuite*));
+    AllTests = (UTestCase**)realloc(
+        AllTests, (n_Tests + 1) * sizeof(UTestCase*));
     AllTests[n_Tests++] = newtest;
 }
 
