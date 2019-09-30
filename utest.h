@@ -73,6 +73,9 @@ int main(void) {
 #define _ARR_EQ_DECL(SUFFIX, TYPE)                   \
 int arr_unordered_eq_##SUFFIX(TYPE*, TYPE*, size_t); \
 int arr_eq_##SUFFIX(TYPE*, TYPE*, size_t);
+
+_ARR_EQ_DECL(s, char*)
+
 #undef _ARR_EQ_DECL
 
 #define _EQ_EXPR(A, B)                                                           \

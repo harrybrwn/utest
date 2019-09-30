@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -g -I.
 
-tests/%: tests/%.c utest.o
+tests/%: tests/%.c
 	$(CC) $(CFLAGS) -DAUTOTEST $^ -o $@
 
 utest.o: utest.c utest.h

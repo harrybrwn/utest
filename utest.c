@@ -26,6 +26,7 @@ void __cleanup(void)
 
 static void RunnerInit(UTestRunner*);
 static int RunTest(UTestRunner*);
+static int PrintIgnored(void);
 
 #define COL_OK      "\x1b[1;32m"
 #define COL_WARNING "\x1b[1;35m"
@@ -37,30 +38,36 @@ static int RunTest(UTestRunner*);
 int RunTests(void)
 {
     int status = 0;
+    int n = n_Tests;
     UTestRunner runner;
     RunnerInit(&runner);
 
-    for (int i = 0; i < n_Tests; i++)
+    n -= PrintIgnored();
+
+    for (int i = 0; i < n; i++)
     {
         _current_test = AllTests[i];
         if (_current_test->ignore) {
             continue;
         }
 
-        runner.test = AllTests[i];
+        runner.test = _current_test;
         status += RunTest(&runner);
     }
     _current_test = NULL;
 
     if (status == 0)
-        printf("\n" MSG_OK ": %d of %d tests passed\n", n_Tests - status, n_Tests);
+        printf("\n" MSG_OK ": %d of %d tests passed\n", n - status, n);
     else
-        printf("\n" MSG_FAIL ": %d of %d tests passed\n", n_Tests - status, n_Tests);
+        printf("\n" MSG_FAIL ": %d of %d tests passed\n", n - status, n);
 
     return status;
 }
 
 static int RunTest(UTestRunner* r) {
+    if (r->test->ignore)
+        return 0;
+
     if (r->test->setup != NULL)
         r->test->setup();
 
@@ -97,9 +104,6 @@ static void RunnerInit(UTestRunner* runner)
 }
 
 void BuildTestCase(UTestCase opt, TestMethod tst, char *name) {
-    if (opt.ignore)
-        return;
-
     UTestCase* newtest = malloc(sizeof(UTestCase));
     newtest->name = name;
     newtest->test = tst;
@@ -121,6 +125,18 @@ void BuildTestCase(UTestCase opt, TestMethod tst, char *name) {
     AllTests = (UTestCase**)realloc(
         AllTests, (n_Tests + 1) * sizeof(UTestCase*));
     AllTests[n_Tests++] = newtest;
+}
+
+static int PrintIgnored(void)
+{
+    int i, n = 0;
+    for (i = 0; i < n_Tests; i++) {
+        if (AllTests[i]->ignore) {
+            printf(COL_WARNING "Ignoring testcase: " COL_RESET "'%s'\n", AllTests[i]->name);
+            n++;
+        }
+    }
+    return n;
 }
 
 int assertion_failure(const char* fmt, ...)
@@ -241,6 +257,21 @@ int arr_eq_##SUFFIX(TYPE *arr1, TYPE *arr2, size_t len) {       \
     return 1;                                                   \
 }
 #undef _ARR_EQ_IMPL
+
+int arr_unordered_eq_s(char** a1, char** a2, size_t len)
+{
+    size_t i, k;
+    for (i = 0; i < len; i++) {
+        for (k = 0; k < len; k++) {
+            if (strcmp(a1[i], a2[k]) == 0) {
+                goto Found;
+            }
+        }
+        return 0;
+    Found:;
+    }
+    return 1;
+}
 
 int arr_eq_s(char** arr1, char** arr2, size_t len) {
     for (size_t i = 0; i < len; i++)

@@ -1,4 +1,46 @@
 #include "utest.h"
+#include "utest.c"
+
+#ifndef AUTOTEST
+int main(void) {
+    char buf[2048];
+    int stdout_save;
+    int outpipe[2];
+
+    const int ignored_tests = 1;
+    char expected[1024];
+
+    strncpy(expected, "\x1b[1;35mIgnore testcase: \x1b[0m'should_be_ignored'\n", 48);
+    memset(expected + 48, '.', (size_t)n_Tests - ignored_tests);
+    sprintf(expected + 48 + n_Tests - ignored_tests,
+        "\n\x1b[1;32mOk\x1b[0m: %d of %d tests passed",
+        n_Tests - ignored_tests, n_Tests - ignored_tests);
+
+
+    // utest_capture_output(NULL);
+    if (pipe(outpipe) != 0)
+        fprintf(stderr, "couldn't create output capture pipe\n");
+    if ((stdout_save = dup(STDOUT_FILENO)) == -1)
+        fprintf(stderr, "couldn't copy stdout\n");
+    if (dup2(outpipe[1], STDOUT_FILENO) == -1)
+        fprintf(stderr, "couldn't rediect stdout to pipe\n");
+
+    RunTests();
+
+    write(outpipe[1], "", 1);
+    close(outpipe[1]);
+    dup2(stdout_save, STDOUT_FILENO);
+    read(outpipe[0], buf, 2048);
+    close(outpipe[0]);
+
+    for (int i = 0; buf[i] != 0; i++)
+    {
+        if (buf[i] != expected[i]) {
+            fprintf(stderr, "bad output: '%c'\n", buf[i]);
+        }
+    }
+}
+#endif
 
 static int setup_counter = 0;
 
