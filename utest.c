@@ -55,6 +55,9 @@ int RunTests(void)
         status += RunTest(&runner);
     }
     _current_test = NULL;
+    if (status > 0) {
+        status = 1;
+    }
 
     if (status == 0)
         printf("\n" MSG_OK ": %d of %d tests passed\n", n - status, n);
