@@ -433,3 +433,14 @@ TEST(read_util_func)
     close(outpipe[0]);
     free(buffer);
 }
+
+TEST(arr_contains_test)
+{
+    char* keys[] = {"one", "two", "three", "four"};
+    size_t len = sizeof(keys) / sizeof(keys[0]);
+    assert(str_arr_contains(keys, len, "one"));
+    assert(0 == str_arr_contains(keys, len, "five"));
+    for (int i = 0; i < (int)len; i++) {
+        assert(str_arr_contains(keys, len, keys[i]));
+    }
+}

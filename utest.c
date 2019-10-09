@@ -286,3 +286,15 @@ int strcomp(char* one, char* two) {
             return 1;
     return 0;
 }
+
+int str_arr_contains(char** arr, size_t len, char* str)
+{
+    size_t i;
+    for (i = 0; i < len; i++)
+    {
+        if (strcmp(str, arr[i]) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}

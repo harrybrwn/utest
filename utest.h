@@ -56,6 +56,7 @@ int binary_compare(byte_t* left, byte_t* right, size_t len);
 
 int arr_eq_s(char** arr1, char** arr2, size_t len);
 int strcomp(char* one, char* two);
+int str_arr_contains(char** arr, size_t len, char* str);
 
 #if defined(AUTOTEST) && !defined(_MAIN_DEFINED) && !defined(_UTEST_IMPL)
 #define _MAIN_DEFINED
