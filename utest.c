@@ -37,28 +37,27 @@ static int PrintIgnored(void);
 
 int RunTests(void)
 {
-    int status = 0;
+    int status = 0, ignored;
     int n = n_Tests;
     UTestRunner runner;
     RunnerInit(&runner);
 
-    PrintIgnored();
+    ignored = PrintIgnored();
 
     for (int i = 0; i < n; i++)
     {
-        _current_test = AllTests[i];
         if (AllTests[i]->ignore) {
             continue;
         }
+
+        _current_test = AllTests[i];
 
         runner.test = _current_test;
         status += RunTest(&runner);
     }
     _current_test = NULL;
-    if (status > 0) {
-        status = 1;
-    }
 
+    n -= ignored;
     if (status == 0)
         printf("\n" MSG_OK ": %d of %d tests passed\n", n - status, n);
     else
@@ -85,7 +84,9 @@ static int RunTest(UTestRunner* r) {
         printf(".");
     else
         printf("x");
-    return r->test->status;
+    if (r->test->status > 0)
+        return 1;
+    return 0;
 }
 
 static int RunnerFail(const char* fmt, ...)
