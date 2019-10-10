@@ -1,2 +1,2 @@
 # utest
-A lightweight, header file only testing framework for c/c++
+A lightweight, single file, testing framework for c/c++
