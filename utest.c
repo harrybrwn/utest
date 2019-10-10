@@ -42,12 +42,12 @@ int RunTests(void)
     UTestRunner runner;
     RunnerInit(&runner);
 
-    n -= PrintIgnored();
+    PrintIgnored();
 
     for (int i = 0; i < n; i++)
     {
         _current_test = AllTests[i];
-        if (_current_test->ignore) {
+        if (AllTests[i]->ignore) {
             continue;
         }
 
