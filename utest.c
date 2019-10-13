@@ -3,6 +3,7 @@
 #undef _UTEST_IMPL
 #include <stdarg.h>
 #include <unistd.h>
+#include <time.h>
 
 int n_Tests;
 UTestCase *_current_test;
@@ -301,4 +302,22 @@ int str_arr_contains(char** arr, size_t len, char* str)
         }
     }
     return 0;
+}
+
+static char character_set[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.-#'?!";
+
+char** random_strings(int n_strings, int str_length)
+{
+    srand(time(0));
+
+    char** list = malloc(sizeof(char*) * n_strings);
+    int i, k;
+    for (i = 0; i < n_strings; i++)
+    {
+        list[i] = malloc((str_length + 1) * sizeof(char));
+        for (k = 0; k < str_length; k++)
+            list[i][k] = character_set[rand() % (sizeof(character_set) - 1)];
+        list[i][k] = '\0';
+    }
+    return list;
 }

@@ -42,8 +42,12 @@ typedef unsigned int byte_t __attribute__((__mode__(QI)));
 
 int RunTests(void);
 
-void BuildTestCase(UTestCase, TestMethod, char *);
+// user utilities
+int str_arr_contains(char** arr, size_t len, char* str);
+char** random_strings(int n_strings, int str_length);
 
+// internal
+void BuildTestCase(UTestCase, TestMethod, char *);
 int assertion_failure(const char* fmt, ...);
 int utest_warning(const char* fmt, ...);
 
@@ -54,9 +58,9 @@ int utest_capture_output(char **buf);
  */
 int binary_compare(byte_t* left, byte_t* right, size_t len);
 
+// internal utilities
 int arr_eq_s(char** arr1, char** arr2, size_t len);
 int strcomp(char* one, char* two);
-int str_arr_contains(char** arr, size_t len, char* str);
 
 #if defined(AUTOTEST) && !defined(_MAIN_DEFINED) && !defined(_UTEST_IMPL)
 #define _MAIN_DEFINED
