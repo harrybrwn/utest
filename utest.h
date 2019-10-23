@@ -9,6 +9,7 @@ extern "C" {
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/time.h>
 
 struct utest_runner;
 
@@ -34,6 +35,14 @@ typedef struct utest_runner
     AssertionMsgFunc fail;
     AssertionMsgFunc warning;
 } UTestRunner;
+
+typedef struct utest_timer {
+    struct timeval start, end;
+} ut_timer_t;
+
+void ut_timer_start(struct utest_timer* timer);
+void ut_timer_end(struct utest_timer* timer);
+double ut_timer_sec(struct utest_timer timer);
 
 extern UTestCase *_current_test;
 
@@ -167,6 +176,8 @@ _ARR_EQ_DECL(s, char*)
         BuildTestCase(opt, TEST_NAME(NAME), #NAME); \
     }                                               \
     _TEST_DECL(NAME)
+
+#define UTEST_IGNORE .ignore = 1
 
 #define CATCH_OUTPUT(BUFFER)         \
 char *BUFFER = NULL;                 \

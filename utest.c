@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 
 int n_Tests;
 UTestCase *_current_test;
@@ -34,7 +35,7 @@ static int PrintIgnored(void);
 #define COL_ERROR   "\x1b[1;31m"
 #define COL_RESET   "\x1b[0m"
 #define MSG_OK   COL_OK "Ok" COL_RESET
-#define MSG_FAIL  COL_ERROR "Fail" COL_RESET
+#define MSG_FAIL COL_ERROR "Fail" COL_RESET
 
 int RunTests(void)
 {
@@ -60,9 +61,11 @@ int RunTests(void)
 
     n -= ignored;
     if (status == 0)
-        printf("\n" MSG_OK ": %d of %d tests passed\n", n - status, n);
+        printf("\n" MSG_OK);
     else
-        printf("\n" MSG_FAIL ": %d of %d tests passed\n", n - status, n);
+        printf("\n" MSG_FAIL);
+
+    printf(": %d of %d tests passed\n", n - status, n);
 
     return status;
 }
@@ -320,4 +323,21 @@ char** random_strings(int n_strings, int str_length)
         list[i][k] = '\0';
     }
     return list;
+}
+
+void ut_timer_start(struct utest_timer* timer)
+{
+    gettimeofday(&timer->start, NULL);
+}
+
+void ut_timer_end(struct utest_timer* timer)
+{
+    gettimeofday(&timer->end, NULL);
+}
+
+double ut_timer_sec(struct utest_timer timer)
+{
+    long sec = (timer.end.tv_sec) - (timer.start.tv_sec);
+    long usec = (timer.end.tv_usec) - (timer.start.tv_usec);
+    return sec + (usec / 1e6);
 }
