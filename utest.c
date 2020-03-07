@@ -194,7 +194,7 @@ size_t pipe_read_util(int fd, char** buffer) {
     return buffer_len;
 }
 
-int utest_capture_output(char **buf)
+int utest_capture_output(char **buf, size_t* len)
 {
     static int init = 1;
     static int stdout_save = -1;
@@ -222,7 +222,7 @@ int utest_capture_output(char **buf)
 
         dup2(stdout_save, STDOUT_FILENO);
 
-        pipe_read_util(outpipe[0], buf);
+        *len = pipe_read_util(outpipe[0], buf);
         _current_test->output = *buf;
         close(outpipe[0]);
 

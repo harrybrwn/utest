@@ -60,7 +60,7 @@ void BuildTestCase(UTestCase, TestMethod, char *);
 int assertion_failure(const char* fmt, ...);
 int utest_warning(const char* fmt, ...);
 
-int utest_capture_output(char **buf);
+int utest_capture_output(char **buf, size_t*);
 
 /**
  * Return: 1 for a match, 0 for no match.
@@ -102,6 +102,9 @@ _ARR_EQ_DECL(s, char*)
 #define FAIL(EXP)                                                       \
     (_current_test->status += assertion_failure("TEST(%s) %s:%d '%s'\n",\
                 _current_test->name, __FILE__, __LINE__, EXP))
+
+#define FAILF(FMT, ...) \
+    (_current_test->status += assertion_failure(FMT, __VA_ARGS__))
 
 #define _ASSERT_FAIL(LEFT, OP, RIGHT) \
     (_current_test->status += assertion_failure("TEST(%s) %s:%d '%s'\n",\
@@ -181,12 +184,13 @@ _ARR_EQ_DECL(s, char*)
 
 #define CATCH_OUTPUT(BUFFER)         \
 char *BUFFER = NULL;                 \
+size_t BUFFER##_length;              \
 _current_test->capture_output = 1;   \
 if (_current_test->output != NULL) { \
     free(_current_test->output);     \
     _current_test->output = NULL;    \
 }                                    \
-while (utest_capture_output(&BUFFER))
+while (utest_capture_output(&BUFFER, &BUFFER##_length))
 
 #ifdef __cplusplus
 }
