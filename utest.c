@@ -29,6 +29,7 @@ void __cleanup(void)
 static void RunnerInit(UTestRunner*);
 static int RunTest(UTestRunner*);
 static int PrintIgnored(void);
+static size_t pipe_read_util(int fd, char** buffer);
 
 #define COL_OK      "\x1b[1;32m"
 #define COL_WARNING "\x1b[1;35m"
@@ -111,7 +112,7 @@ static void RunnerInit(UTestRunner* runner)
     runner->warning = utest_warning;
 }
 
-void BuildTestCase(UTestCase opt, TestMethod tst, char *name) {
+void utest_build_testcase(UTestCase opt, TestMethod tst, char *name) {
     UTestCase* newtest = malloc(sizeof(UTestCase));
     newtest->name = name;
     newtest->test = tst;
@@ -152,7 +153,6 @@ int assertion_failure(const char* fmt, ...)
     char fmtbuf[256];
     va_list args;
     snprintf(fmtbuf, sizeof(fmtbuf), COL_ERROR "Assertion Failure:" COL_RESET " %s", fmt);
-
     va_start(args, fmt);
     vfprintf(stderr, fmtbuf, args);
     va_end(args);
@@ -164,34 +164,10 @@ int utest_warning(const char* fmt, ...)
     char fmtbuf[256];
     va_list args;
     snprintf(fmtbuf, sizeof(fmtbuf), COL_WARNING "Test Warning:" COL_RESET " %s", fmt);
-
     va_start(args, fmt);
     vfprintf(stdout, fmtbuf, args);
     va_end(args);
     return 1;
-}
-
-size_t pipe_read_util(int fd, char** buffer) {
-    char buf[256];
-    size_t buffer_len = 0;
-    size_t read_count = read(fd, buf, sizeof(buf)-1);
-
-    if (read_count > 0) {
-        if (*buffer == NULL) {
-            *buffer = malloc(read_count + 1);
-        }
-        memcpy(*buffer, buf, read_count + 1);
-    }
-    buffer_len = read_count;
-
-    while (read_count == sizeof(buf) - 1) {
-        read_count = read(fd, buf, sizeof(buf) - 1);
-        buffer_len += read_count;
-
-        *buffer = realloc(*buffer, buffer_len + 1);
-        memcpy(*buffer + buffer_len - read_count, buf, read_count + 1);
-    }
-    return buffer_len;
 }
 
 int utest_capture_output(char **buf, size_t* len)
@@ -233,6 +209,29 @@ int utest_capture_output(char **buf, size_t* len)
     }
 }
 
+static size_t pipe_read_util(int fd, char** buffer) {
+    char buf[256];
+    size_t buffer_len = 0;
+    size_t read_count = read(fd, buf, sizeof(buf)-1);
+
+    if (read_count > 0) {
+        if (*buffer == NULL) {
+            *buffer = malloc(read_count + 1);
+        }
+        memcpy(*buffer, buf, read_count + 1);
+    }
+    buffer_len = read_count;
+
+    while (read_count == sizeof(buf) - 1) {
+        read_count = read(fd, buf, sizeof(buf) - 1);
+        buffer_len += read_count;
+
+        *buffer = realloc(*buffer, buffer_len + 1);
+        memcpy(*buffer + buffer_len - read_count, buf, read_count + 1);
+    }
+    return buffer_len;
+}
+
 /**
  * Return: 1 for a match, 0 for not the same.
  */
@@ -264,7 +263,7 @@ int arr_eq_##SUFFIX(TYPE *arr1, TYPE *arr2, size_t len) {       \
             return 0;                                           \
     return 1;                                                   \
 }
-#undef _ARR_EQ_IMPL
+#undef _ARR_EQ_IMPL // Not currently using this
 
 int arr_unordered_eq_s(char** a1, char** a2, size_t len)
 {
