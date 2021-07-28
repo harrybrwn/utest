@@ -104,7 +104,8 @@ _ARR_EQ_DECL(s, char*)
                 _current_test->name, __FILE__, __LINE__, EXP))
 
 #define FAILF(FMT, ...) \
-    (_current_test->status += assertion_failure(FMT, __VA_ARGS__))
+    (_current_test->status += assertion_failure("TEST(%s) %s:%d " FMT, \
+                _current_test->name, __FILE__, __LINE__, __VA_ARGS__))
 
 #define _ASSERT_FAIL(LEFT, OP, RIGHT) \
     (_current_test->status += assertion_failure("TEST(%s) %s:%d '%s'\n",\
