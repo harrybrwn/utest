@@ -348,32 +348,38 @@ TEST(output_capture_test, .ignore = 0)
 {
     {
         char *buf = NULL;
-        assert(utest_capture_output(NULL) == 1);
+        size_t len;
+        assert(utest_capture_output(NULL, &len) == 1);
         printf("hello");
-        assert(utest_capture_output(&buf) == 0);
+        assert(utest_capture_output(&buf, &len) == 0);
         assert(buf != NULL);
+        eq((int)len, 6);
         eqn(buf, "hello", 6);
         free(buf);
     }
 
     {
         char *buf = NULL;
-        assert(utest_capture_output(&buf) == 1);
+        size_t len;
+        assert(utest_capture_output(&buf, &len) == 1);
         printf("this is a test\n");
         printf("for multi-line...\n");
         printf("output captures");
-        assert(utest_capture_output(&buf) == 0);
-        eq((char*)buf,
+        assert(utest_capture_output(&buf, &len) == 0);
+        const char exp[] = ""
             "this is a test\n"
             "for multi-line...\n"
-            "output captures"
-        );
+            "output captures";
+        eq((int)len, 49);
+        eq(len, sizeof(exp));
+        eqn((char*)buf, (char*)exp, sizeof(exp));
         free(buf);
     }
 
     {
         char *output = NULL;
-        while (utest_capture_output(&output)) {
+        size_t len;
+        while (utest_capture_output(&output, &len)) {
             printf("output");
             printf("output");
         }
