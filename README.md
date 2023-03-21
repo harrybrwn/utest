@@ -6,16 +6,7 @@ A lightweight, single file, testing framework for c/c++
 This is not necessary for using this framework but it is how I usually set
 things up.
 
-First make a directory to put all your tests in and clone the framework locally
-into the test directory. You may want to add `tests/utest` to your `.gitignore`
-file after this is done.
-
-```sh
-mkdir tests
-git clone https://github.com/harrybrwn/utest tests/utest
-```
-
-Next, create a file `tests/test.c` to put the starter code in. The `AUTOTEST`
+First, create a file `tests/test.c` to put the starter code in. The `AUTOTEST`
 macro is important here because it tells the library to automatically insert
 a main function to run all the tests.
 
@@ -32,24 +23,28 @@ TEST(hello_world)
 }
 ```
 
-Finally, we setup the build system with a few extra commands in a Makefile.
+Next, install the helper makefile.
+
+```
+curl -sLO https://raw.githubusercontent.com/harrybrwn/utest/master/utest.mk
+```
+
+Finally, we setup the build system with a few commands in a Makefile.
 
 ```makefile
-# Run the compiled test program
-test: tests/test
-    @$<
+UTEST_BIN=./tests/test
+UTEST_DEPS=example-file.o example-file.h
 
-# Compile the tests
-tests/test: tests/utest.o tests/test.c
+example-file.o: example-file.c
+  $(CC) -c $< -o $@
 
-# Build the library
-tests/utest.o: tests/utest/utest.c
-    $(CC) $(CFLAGS) -c $< -o $@
+include utest.mk
+```
 
-tests/utest/utest.c:
-    git clone https://github.com/harrybrwn/utest tests/utest
+Now build and run the tests.
 
-.PHONY: test
+```
+make test
 ```
 
 ## Functions and Macros
@@ -96,4 +91,3 @@ TEST(ignored_test, .ignore = 1)
 ## Types and Structs
 
 - `UTestCase` A struct that holds all the metadata for one test.
-
